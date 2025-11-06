@@ -45,6 +45,7 @@ class CountersinkDepthEstimator:
                  lateral_filter: bool = True,  # Apply lateral distance filtering from hole center
                  lateral_filter_threshold: float = 3.0,  # Maximum lateral distance from hole center (mm)
                  visualize_lateral_filter: bool = False,  # Show lateral filtering visualization
+                 visualize_plane_fitting: bool = False,  # Show plane fitting visualization
                  z_filter: bool = True,  # Apply z-direction filtering for hole points
                  z_filter_threshold: float = 0.6,  # Maximum z distance from median z (mm)
                  outlier_method: str = 'percentile',  # 'percentile' or 'median_filter'
@@ -67,6 +68,7 @@ class CountersinkDepthEstimator:
         self.lateral_filter = lateral_filter
         self.lateral_filter_threshold = lateral_filter_threshold
         self.visualize_lateral_filter = visualize_lateral_filter
+        self.visualize_plane_fitting = visualize_plane_fitting
         self.z_filter = z_filter
         self.z_filter_threshold = z_filter_threshold
         self.outlier_method = outlier_method.lower()
@@ -458,6 +460,190 @@ Threshold: {self.lateral_filter_threshold:.2f} mm"""
         # Show plot if requested
         if show_plot:
             plt.show()
+    
+    def visualize_plane_fitting_plot(self, points: np.ndarray, inlier_mask: np.ndarray, 
+                                     surface_normal: np.ndarray, surface_point: np.ndarray,
+                                     title: str = "RANSAC Plane Fitting Results",
+                                     show_plot: bool = True, save_path: str = None) -> None:
+        """
+        Visualize the RANSAC plane fitting results with color-coded inliers/outliers
+        
+        Creates a 3D plot showing:
+        - Inlier points (green) - points that fit the plane well
+        - Outlier points (red) - points that were rejected by RANSAC
+        - Fitted plane surface (semi-transparent)
+        - Surface normal vector
+        
+        Args:
+            points: Point cloud data (N x 3 array)
+            inlier_mask: Boolean mask indicating which points are inliers
+            surface_normal: Normal vector of the fitted plane
+            surface_point: A point on the fitted plane
+            title: Title for the plot
+            show_plot: Whether to display the plot
+            save_path: Optional path to save the plot
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        
+        print(f"Debug visualization: points type: {type(points)}, inlier_mask type: {type(inlier_mask)}")
+        if hasattr(points, 'shape'):
+            print(f"Debug visualization: points shape: {points.shape}")
+        if hasattr(inlier_mask, 'shape'):
+            print(f"Debug visualization: inlier_mask shape: {inlier_mask.shape}")
+        
+        try:
+            if len(points) == 0:
+                print("No points to visualize")
+                return
+            
+            print("Debug: passed len(points) check")
+        except Exception as e:
+            print(f"Error in len(points) check: {e}")
+            return
+        
+        try:
+            # Calculate inlier statistics
+            n_total = len(points)
+            print(f"Debug: n_total = {n_total}")
+            n_inliers = np.sum(inlier_mask)
+            print(f"Debug: n_inliers = {n_inliers}")
+            n_outliers = n_total - n_inliers
+            inlier_percentage = (n_inliers / n_total) * 100
+            print(f"Debug: calculated basic stats")
+        except Exception as e:
+            print(f"Error calculating basic stats: {e}")
+            return
+        
+        try:
+            # Calculate distances to plane for statistics
+            print(f"Debug: About to calculate distances")
+            distances = np.abs(np.dot(points - surface_point, surface_normal))
+            print(f"Debug: distances calculated, shape: {distances.shape}")
+            inlier_distances = distances[inlier_mask]
+            print(f"Debug: inlier_distances calculated, shape: {inlier_distances.shape}")
+            inlier_std = np.std(inlier_distances) if len(inlier_distances) > 0 else 0
+            print(f"Debug: inlier_std = {inlier_std}")
+        except Exception as e:
+            print(f"Error calculating distances: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        try:
+            # Create 3D plot
+            print(f"Debug: About to create 3D plot")
+            fig = plt.figure(figsize=(12, 9))
+            ax = fig.add_subplot(111, projection='3d')
+            print(f"Debug: 3D plot created")
+        except Exception as e:
+            print(f"Error creating 3D plot: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        try:
+            # Plot inlier points (green)
+            print(f"Debug: About to plot inlier points, n_inliers = {n_inliers}")
+            if n_inliers > 0:
+                print(f"Debug: points[inlier_mask, 0] shape: {points[inlier_mask, 0].shape}")
+                ax.scatter(points[inlier_mask, 0], points[inlier_mask, 1], points[inlier_mask, 2],
+                          c='green', alpha=0.7, s=20, label=f'Inliers ({n_inliers})')
+                print(f"Debug: Inlier points plotted")
+        except Exception as e:
+            print(f"Error plotting inlier points: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        try:
+            # Plot outlier points (red)
+            print(f"Debug: About to plot outlier points, n_outliers = {n_outliers}")
+            if n_outliers > 0:
+                outlier_mask = ~inlier_mask
+                print(f"Debug: outlier_mask shape: {outlier_mask.shape}")
+                print(f"Debug: points[outlier_mask, 0] shape: {points[outlier_mask, 0].shape}")
+                ax.scatter(points[outlier_mask, 0], points[outlier_mask, 1], points[outlier_mask, 2],
+                          c='red', alpha=0.7, s=20, label=f'Outliers ({n_outliers})')
+                print(f"Debug: Outlier points plotted")
+        except Exception as e:
+            print(f"Error plotting outlier points: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        # Create plane mesh for visualization
+        x_range = points[:, 0].max() - points[:, 0].min()
+        y_range = points[:, 1].max() - points[:, 1].min()
+        max_range = max(x_range, y_range)
+        
+        # Create grid for plane visualization
+        x_center = np.mean(points[:, 0])
+        y_center = np.mean(points[:, 1])
+        extent = max_range * 0.6  # Make plane slightly smaller than point cloud extent
+        
+        xx, yy = np.meshgrid(
+            np.linspace(x_center - extent/2, x_center + extent/2, 20),
+            np.linspace(y_center - extent/2, y_center + extent/2, 20)
+        )
+        
+        # Calculate z coordinates for the plane
+        # Plane equation: normal · (point - surface_point) = 0
+        # z = surface_point[2] - (normal[0]*(x - surface_point[0]) + normal[1]*(y - surface_point[1])) / normal[2]
+        if abs(surface_normal[2]) > 1e-6:  # Avoid division by zero
+            zz = surface_point[2] - (surface_normal[0] * (xx - surface_point[0]) + 
+                                   surface_normal[1] * (yy - surface_point[1])) / surface_normal[2]
+            
+            # Plot the plane surface
+            ax.plot_surface(xx, yy, zz, alpha=0.3, color='blue', label='Fitted Plane')
+        
+        # Plot surface normal vector
+        normal_scale = max_range * 0.3
+        ax.quiver(surface_point[0], surface_point[1], surface_point[2],
+                 surface_normal[0] * normal_scale, 
+                 surface_normal[1] * normal_scale, 
+                 surface_normal[2] * normal_scale,
+                 color='blue', arrow_length_ratio=0.1, linewidth=3, label='Surface Normal')
+        
+        # Set labels and title
+        ax.set_xlabel('X (mm)')
+        ax.set_ylabel('Y (mm)')
+        ax.set_zlabel('Z (mm)')
+        ax.set_title(f'{title}\n{inlier_percentage:.1f}% inliers, σ = {inlier_std:.3f} mm')
+        
+        # Add legend
+        ax.legend()
+        
+        # Set equal aspect ratio
+        max_extent = max(x_range, y_range, points[:, 2].max() - points[:, 2].min())
+        center = np.mean(points, axis=0)
+        ax.set_xlim(center[0] - max_extent/2, center[0] + max_extent/2)
+        ax.set_ylim(center[1] - max_extent/2, center[1] + max_extent/2)
+        ax.set_zlim(center[2] - max_extent/2, center[2] + max_extent/2)
+        
+        # Add statistics text box
+        stats_text = f"""Plane Fitting Statistics:
+Total points: {n_total}
+Inliers: {n_inliers} ({inlier_percentage:.1f}%)
+Outliers: {n_outliers} ({(n_outliers/n_total)*100:.1f}%)
+Inlier std dev: {inlier_std:.4f} mm
+Normal vector: ({surface_normal[0]:.3f}, {surface_normal[1]:.3f}, {surface_normal[2]:.3f})
+Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2]:.3f})"""
+        
+        # Position text box
+        fig.text(0.02, 0.02, stats_text, fontsize=9, verticalalignment='bottom',
+                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+        
+        plt.tight_layout()
+        
+        # Save plot if requested
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Plane fitting visualization saved to: {save_path}")
+        
+        # Show plot if requested
+        if show_plot:
+            plt.show()
         else:
             plt.close()
 
@@ -576,7 +762,7 @@ Threshold: {self.lateral_filter_threshold:.2f} mm"""
         points = np.column_stack([x, y, z])
         
         # Method 1: Try PCA on points with highest z-values (likely surface points)
-        # Take top 50% of points by z-value as initial surface candidates
+        # Take top 80% of points by z-value as initial surface candidates
         z_percentile = np.percentile(z, 50)
         surface_candidates = points[z >= z_percentile]
         
@@ -602,8 +788,8 @@ Threshold: {self.lateral_filter_threshold:.2f} mm"""
             surface_normal = -surface_normal
             
         # Refine using RANSAC-like approach with configurable sample points
-        best_normal, best_point = self._ransac_plane_fit(surface_candidates, surface_normal, centroid, 
-                                                        n_sample_points=self.ransac_sample_points)
+        best_normal, best_point, inlier_mask = self._ransac_plane_fit(surface_candidates, surface_normal, centroid, 
+                                                                     n_sample_points=self.ransac_sample_points)
         
         # Determine thickness threshold based on point cloud density and surface quality
         distances_to_plane = np.abs(np.dot(points - best_point, best_normal))
@@ -619,6 +805,13 @@ Threshold: {self.lateral_filter_threshold:.2f} mm"""
         print(f"Estimated surface normal: ({best_normal[0]:.3f}, {best_normal[1]:.3f}, {best_normal[2]:.3f})")
         print(f"Surface point: ({best_point[0]:.3f}, {best_point[1]:.3f}, {best_point[2]:.3f})")
         print(f"Surface thickness threshold: {thickness_threshold:.3f} mm")
+        
+        # Visualize plane fitting if requested
+        if self.visualize_plane_fitting:
+            print(f"Debug: surface_candidates type: {type(surface_candidates)}, shape: {surface_candidates.shape}")
+            print(f"Debug: inlier_mask type: {type(inlier_mask)}, shape: {inlier_mask.shape}")
+            self.visualize_plane_fitting_plot(surface_candidates, inlier_mask, best_normal, best_point,
+                                             title="Surface Plane RANSAC Fitting")
         
         return best_normal, best_point, thickness_threshold
     
@@ -2406,6 +2599,8 @@ def main():
                        help='Maximum lateral distance from hole center in mm (default: 3.0)')
     parser.add_argument('--visualize-lateral-filter', action='store_true',
                        help='Show visualization of lateral filtering process')
+    parser.add_argument('--visualize-plane-fitting', action='store_true',
+                       help='Show visualization of RANSAC plane fitting process')
     parser.add_argument('--no-z-filter', action='store_true',
                        help='Disable z-direction filtering for hole points')
     parser.add_argument('--z-filter-threshold', type=float, default=0.6,
@@ -2439,6 +2634,7 @@ def main():
         lateral_filter=not args.no_lateral_filter,
         lateral_filter_threshold=args.lateral_filter_threshold,
         visualize_lateral_filter=args.visualize_lateral_filter,
+        visualize_plane_fitting=args.visualize_plane_fitting,
         z_filter=not args.no_z_filter,
         z_filter_threshold=args.z_filter_threshold,
         outlier_method=args.outlier_method,
