@@ -92,7 +92,11 @@ class BatchCountersinkAnalyzer:
             'meters_to_mm': False,  # We handle this in preprocessing
             'noise_filter': True,
             'noise_neighbors': 100,  # Match countersink_depth_estimator.py default
-            'noise_radius': 0.5     # Match countersink_depth_estimator.py default
+            'noise_radius': 0.5,     # Match countersink_depth_estimator.py default
+            'outlier_method': 'percentile',
+            'outlier_threshold': 0.1,
+            'random_seed': 42,
+            'ransac_sample_points': 3
         }
         
         if estimator_params:
@@ -1012,7 +1016,15 @@ def main():
                        help='Minimum neighbors for noise filter')
     parser.add_argument('--noise-radius', type=float, default=0.5,
                        help='Search radius for noise filter (mm)')
-    parser.add_argument('--analysis-method', choices=['separate', 'global'], default='separate',
+    parser.add_argument('--outlier-method', choices=['percentile', 'median_filter'], default='percentile',
+                       help='Outlier removal method')
+    parser.add_argument('--outlier-threshold', type=float, default=0.1,
+                       help='Outlier threshold (fraction for percentile, multiplier for median_filter)')
+    parser.add_argument('--random-seed', type=int, default=42,
+                       help='Random seed for reproducible results')
+    parser.add_argument('--ransac-sample-points', type=int, default=3,
+                       help='Number of points to sample for RANSAC plane fitting')
+    parser.add_argument('--analysis-method', choices=['separate', 'global'], default='global',
                        help='Analysis method: separate (analyze left/right separately) or global (global plane first)')
     
     args = parser.parse_args()
@@ -1028,7 +1040,11 @@ def main():
         'expected_inner_radius': args.inner_radius,
         'optimizer': args.optimizer,
         'noise_neighbors': args.noise_neighbors,
-        'noise_radius': args.noise_radius
+        'noise_radius': args.noise_radius,
+        'outlier_method': args.outlier_method,
+        'outlier_threshold': args.outlier_threshold,
+        'random_seed': args.random_seed,
+        'ransac_sample_points': args.ransac_sample_points
     }
     
     # Create analyzer

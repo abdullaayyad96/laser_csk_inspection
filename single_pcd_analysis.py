@@ -73,7 +73,8 @@ class SinglePCDAnalyzer:
             'noise_radius': 0.5,     # Match countersink_depth_estimator.py default
             'outlier_method': 'percentile',
             'outlier_threshold': 0.1,
-            'random_seed': 42
+            'random_seed': 42,
+            'ransac_sample_points': 3
         }
         
         if estimator_params:

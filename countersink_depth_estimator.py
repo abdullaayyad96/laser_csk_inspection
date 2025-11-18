@@ -51,6 +51,8 @@ class CountersinkDepthEstimator:
                  outlier_method: str = 'percentile',  # 'percentile' or 'median_filter'
                  outlier_threshold: float = 0.02,  # For percentile: fraction to remove (0.02 = 2%), for median_filter: multiplier (e.g., 3.0)
                  ransac_sample_points: int = 10,  # Number of points to sample for RANSAC plane fitting
+                 refine_plane_fit: bool = True,  # Perform SVD refinement on inlier set after RANSAC
+                 max_refinement_points: int = 1000,  # Maximum number of inliers to use for refinement
                  random_seed: int = 42):  # Random seed for reproducible RANSAC results
         
         self.expected_csk_angle_deg = expected_csk_angle_deg
@@ -74,6 +76,8 @@ class CountersinkDepthEstimator:
         self.outlier_method = outlier_method.lower()
         self.outlier_threshold = outlier_threshold
         self.ransac_sample_points = ransac_sample_points
+        self.refine_plane_fit = refine_plane_fit
+        self.max_refinement_points = max_refinement_points
         self.random_seed = random_seed
         
         # Validate optimizer choice
@@ -100,6 +104,8 @@ class CountersinkDepthEstimator:
         print(f"   outlier_method: '{self.outlier_method}'")
         print(f"   outlier_threshold: {self.outlier_threshold:.6f}")
         print(f"   ransac_sample_points: {self.ransac_sample_points}")
+        print(f"   refine_plane_fit: {self.refine_plane_fit}")
+        print(f"   max_refinement_points: {self.max_refinement_points}")
         print(f"   random_seed: {self.random_seed}")
         print(f"   expected_half_angle (rad): {self.expected_half_angle:.6f}")
         
@@ -763,7 +769,7 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
         
         # Method 1: Try PCA on points with highest z-values (likely surface points)
         # Take top 80% of points by z-value as initial surface candidates
-        z_percentile = np.percentile(z, 50)
+        z_percentile = np.percentile(z, 20)
         surface_candidates = points[z >= z_percentile]
         
         if len(surface_candidates) < 10:
@@ -891,12 +897,90 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
                 # Skip this iteration if SVD fails
                 continue
         
+        # Refinement step: Use SVD on the inlier set for improved plane fitting
+        if self.refine_plane_fit and np.sum(best_inlier_mask) > 3:
+            print(f"  🔧 Performing plane refinement using inlier set...")
+            
+            # Get inlier points
+            inlier_points = points[best_inlier_mask]
+            n_inliers = len(inlier_points)
+            
+            # Subsample if we have too many inliers for efficiency
+            if n_inliers > self.max_refinement_points:
+                print(f"  📊 Subsampling {n_inliers} inliers to {self.max_refinement_points} for refinement")
+                # Use deterministic sampling based on random seed
+                np.random.seed(self.random_seed + 1)  # Different seed than RANSAC
+                subsample_indices = np.random.choice(n_inliers, self.max_refinement_points, replace=False)
+                refinement_points = inlier_points[subsample_indices]
+            else:
+                refinement_points = inlier_points
+                print(f"  📊 Using all {n_inliers} inliers for refinement")
+            
+            try:
+                # Perform SVD on the entire inlier set (or subsample)
+                refinement_centroid = np.mean(refinement_points, axis=0)
+                centered_refinement = refinement_points - refinement_centroid
+                
+                # Compute covariance matrix using all inliers
+                refinement_cov_matrix = np.cov(centered_refinement.T)
+                refinement_eigenvals, refinement_eigenvecs = np.linalg.eigh(refinement_cov_matrix)
+                
+                # Normal is eigenvector with smallest eigenvalue
+                refinement_normal_idx = np.argmin(refinement_eigenvals)
+                refined_normal = refinement_eigenvecs[:, refinement_normal_idx]
+                
+                if np.linalg.norm(refined_normal) < 1e-6:
+                    print(f"  ⚠️  Refinement produced degenerate normal, keeping RANSAC result")
+                else:
+                    # Normalize the refined normal
+                    refined_normal = refined_normal / np.linalg.norm(refined_normal)
+                    
+                    # Ensure consistent orientation with RANSAC result
+                    if np.dot(refined_normal, best_normal) < 0:
+                        refined_normal = -refined_normal
+                    
+                    # Update surface point to centroid of refinement points (ensures it lies on plane)
+                    refined_point = refinement_centroid
+                    
+                    # Validate refinement: check if it's better than RANSAC result
+                    # Calculate inlier count with refined plane
+                    refined_distances = np.abs(np.dot(points - refined_point, refined_normal))
+                    refined_inlier_mask = refined_distances < self.surface_thickness
+                    refined_inlier_count = np.sum(refined_inlier_mask)
+                    
+                    # Calculate standard deviation improvement
+                    refined_inlier_distances = refined_distances[refined_inlier_mask]
+                    refined_inlier_std = np.std(refined_inlier_distances) if len(refined_inlier_distances) > 0 else float('inf')
+                    
+                    original_inlier_distances = np.abs(np.dot(points - best_point, best_normal))[best_inlier_mask]
+                    original_inlier_std = np.std(original_inlier_distances) if len(original_inlier_distances) > 0 else float('inf')
+                    
+                    # Accept refinement if it maintains or improves inlier count and reduces std dev
+                    if refined_inlier_count >= best_inlier_count * 0.95 and refined_inlier_std <= original_inlier_std * 1.1:
+                        print(f"  ✅ Refinement accepted:")
+                        print(f"     Inliers: {best_inlier_count} → {refined_inlier_count}")
+                        print(f"     Std dev: {original_inlier_std:.6f} → {refined_inlier_std:.6f} mm")
+                        print(f"     Normal change: {np.degrees(np.arccos(np.abs(np.dot(best_normal, refined_normal)))):.2f}°")
+                        
+                        # Update best results with refined values
+                        best_normal = refined_normal
+                        best_point = refined_point
+                        best_inlier_mask = refined_inlier_mask
+                        best_inlier_count = refined_inlier_count
+                    else:
+                        print(f"  ❌ Refinement rejected (worse fit):")
+                        print(f"     Inliers: {best_inlier_count} → {refined_inlier_count}")
+                        print(f"     Std dev: {original_inlier_std:.6f} → {refined_inlier_std:.6f} mm")
+                        
+            except (np.linalg.LinAlgError, ValueError) as e:
+                print(f"  ❌ Refinement failed: {e}, keeping RANSAC result")
+        
         # Calculate final statistics
         final_distances = np.abs(np.dot(points - best_point, best_normal))
         inlier_std = np.std(final_distances[best_inlier_mask]) if np.sum(best_inlier_mask) > 0 else 0.0
         
         print(f"  RANSAC plane fit: {best_inlier_count} inliers from {len(points)} candidates using {n_sample_points} sample points")
-        print(f"  Inlier distance std dev: {inlier_std:.4f} mm")
+        print(f"  Final inlier std dev: {inlier_std:.4f} mm")
         
         return best_normal, best_point, best_inlier_mask
 
@@ -1011,10 +1095,10 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
         
         if len(x) < self.min_hole_points:
             raise ValueError(f"Insufficient points for cone fitting: {len(x)} < {self.min_hole_points}")
-        
+        print("fitting cone using SLSQP with Adaptive Outlier Removal (AA)...")
         # Initial guess (same as other methods)
         hole_centroid = [np.median(x), np.median(y), np.median(z)]
-        hole_radius_estimate = np.sqrt(np.median(x**2 + y**2))
+        hole_radius_estimate = 2.5#np.sqrt(np.median(x**2 + y**2))
         
         if hole_radius_estimate > 0:
             estimated_apex_offset = hole_radius_estimate / np.tan(self.expected_half_angle)
@@ -1023,7 +1107,6 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
         else:
             initial_apex = [hole_centroid[0], hole_centroid[1], z.min() - 0.5]
 
-        initial_apex = [hole_centroid[0], hole_centroid[1], self.results['surface_point'][2] - 1.5] 
         initial_axis = [0, 0, 1]
         
         print(f"  Initial apex estimate (SLSQP-AA): ({initial_apex[0]:.3f}, {initial_apex[1]:.3f}, {initial_apex[2]:.3f})")
@@ -1325,11 +1408,11 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
         
         # Improved initial guess based on cone geometry
         # Find the centroid of all hole points for better initial estimate
-        hole_centroid = [np.mean(x), np.mean(y), np.mean(z)]
+        hole_centroid = [np.median(x), np.median(y), np.median(z)]
         
         # Estimate initial apex position using expected geometry
         # The apex should be approximately at the extrapolated tip of the cone
-        hole_radius_estimate = np.sqrt(np.mean(x**2 + y**2))  # RMS radius
+        hole_radius_estimate = 2.5#np.sqrt(np.mean(x**2 + y**2))  # RMS radius
         
         # Using cone geometry: if we're at radius R and half-angle θ, 
         # the apex is at distance R/tan(θ) further along the axis
@@ -1608,8 +1691,8 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
             raise ValueError(f"Insufficient points for cone fitting: {len(x)} < {self.min_hole_points}")
         
         # Initial guess (same as least squares method)
-        hole_centroid = [np.mean(x), np.mean(y), np.mean(z)]
-        hole_radius_estimate = np.sqrt(np.mean(x**2 + y**2))
+        hole_centroid = [np.median(x), np.median(y), np.median(z)]
+        hole_radius_estimate = 2.5#np.sqrt(np.mean(x**2 + y**2))
         
         if hole_radius_estimate > 0:
             estimated_apex_offset = hole_radius_estimate / np.tan(self.expected_half_angle)
@@ -2020,6 +2103,10 @@ Surface point: ({surface_point[0]:.3f}, {surface_point[1]:.3f}, {surface_point[2
         
         # Fit cone to hole points
         cone_fit = self.fit_cone_to_points(hole_points)
+        
+        # Store segmentation results for visualization access
+        self.surface_points = surface_points
+        self.hole_points = hole_points
         
         # Calculate depth
         depth_results = self.calculate_depth(surface_points, hole_points, cone_fit)
