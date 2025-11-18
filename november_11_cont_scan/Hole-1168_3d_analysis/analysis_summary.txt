@@ -1,0 +1,35 @@
+COUNTERSINK DEPTH ANALYSIS SUMMARY
+==================================================
+
+Input File: november_11_cont_scan\Hole-1168_3d.pcd
+Analysis Date: 2025-11-18T14:06:30.647723
+Original Points: 137,805
+
+SPLIT INFORMATION
+--------------------
+Split method: center
+Split line: -0.069
+No-use zone: 30%
+
+LEFT SIDE ANALYSIS
+--------------------
+Total Depth: 1.100316 mm
+Apex Depth: 2.144504 mm
+RMSE: 0.048088 mm
+Surface Points: 43,018
+Hole Points: 9,442
+
+RIGHT SIDE ANALYSIS
+--------------------
+Total Depth: 1.044007 mm
+Apex Depth: 2.087997 mm
+RMSE: 0.052212 mm
+Surface Points: 42,600
+Hole Points: 8,823
+
+ANALYSIS SUMMARY
+--------------------
+Average Depth: 1.072161 mm
+Depth Difference: 0.056309 mm
+Left Depth: 1.100316 mm
+Right Depth: 1.044007 mm

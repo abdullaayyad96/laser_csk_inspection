@@ -41,21 +41,30 @@ except ImportError as e:
     print("Please ensure all required scripts are in the same directory")
     sys.exit(1)
 
-class SinglePCDAnalyzer:
+class CountersinkAnalysisBase:
+    """Base class with shared functionality for countersink analysis"""
+    
     def __init__(self, 
                  estimator_params: Dict = None,
                  save_intermediate: bool = True,
-                 generate_plots: bool = False):
+                 generate_plots: bool = False,
+                 analysis_method: str = 'global'):
         """
-        Initialize single PCD analyzer
+        Initialize base analyzer
         
         Args:
             estimator_params: Parameters for CountersinkDepthEstimator
             save_intermediate: Save intermediate processed PCD files
             generate_plots: Generate visualization plots for analysis
+            analysis_method: 'separate' (split first) or 'global' (global plane first)
         """
         self.save_intermediate = save_intermediate
         self.generate_plots = generate_plots
+        self.analysis_method = analysis_method
+        
+        # Validate analysis method
+        if self.analysis_method not in ['separate', 'global']:
+            raise ValueError(f"Invalid analysis method: {analysis_method}. Must be 'separate' or 'global'")
         
         # Initialize components with reusable functionality
         self.pcd_converter = PCDConverter()
@@ -82,8 +91,121 @@ class SinglePCDAnalyzer:
         
         self.estimator_params = default_params
         
-        print(f"🚀 Single PCD Analyzer initialized")
+        print(f"🚀 Countersink Analyzer initialized")
+        print(f"   Analysis method: {self.analysis_method}")
         print(f"   Estimator parameters: {self.estimator_params}")
+
+    def load_and_convert_point_cloud(self, pcd_file_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict]:
+        """
+        Load point cloud from file and apply coordinate transformations
+        Separated for flexibility with different data sources
+        
+        Args:
+            pcd_file_path: Path to the point cloud file
+            
+        Returns:
+            Tuple of (x_converted, y_converted, z_converted, metadata)
+        """
+        print(f"  📁 Loading point cloud: {Path(pcd_file_path).name}")
+        
+        # Load raw point cloud
+        x_raw, y_raw, z_raw, header_lines = self.pcd_converter.load_pcd_file(pcd_file_path)
+        
+        # Apply coordinate transformations
+        x_converted, y_converted, z_converted = self.pcd_converter.apply_transformations(
+            x_raw, y_raw, z_raw, meters_to_mm=True, flip_z=True
+        )
+        
+        metadata = {
+            'original_points': len(x_raw),
+            'converted_points': len(x_converted),
+            'transformations': ['meters_to_mm', 'flip_z'],
+            'header_lines': header_lines
+        }
+        
+        print(f"     Loaded and converted {len(x_converted):,} points")
+        return x_converted, y_converted, z_converted, metadata
+    
+    def _process_with_separate_analysis(self, x_raw: np.ndarray, y_raw: np.ndarray, z_raw: np.ndarray, 
+                                       file_info: Dict) -> Tuple[Dict, Dict, Dict, float]:
+        """
+        Process point cloud with separate left/right analysis (split before conversion)
+        
+        Args:
+            x_raw, y_raw, z_raw: Raw point cloud coordinates
+            file_info: File information dictionary
+            
+        Returns:
+            Tuple of (left_results, right_results, bilateral_analysis, split_line)
+        """
+        print(f"  📋 Using separate analysis method")
+        
+        # Step 1: Split raw point cloud into left/right (split BEFORE conversion)
+        left_raw, right_raw, split_line = self.pcd_tester.split_point_cloud(x_raw, y_raw, z_raw)
+        
+        # Step 2: Convert each half separately
+        print(f"  ✨ Converting left half ({len(left_raw['x'])} pts) to mm + flip Z")
+        if len(left_raw['x']) > 0:
+            lx, ly, lz = self.pcd_converter.apply_transformations(
+                left_raw['x'], left_raw['y'], left_raw['z'], meters_to_mm=True, flip_z=True
+            )
+            left_points = {'x': lx, 'y': ly, 'z': lz}
+        else:
+            left_points = {'x': np.array([]), 'y': np.array([]), 'z': np.array([])}
+
+        print(f"  ✨ Converting right half ({len(right_raw['x'])} pts) to mm + flip Z")
+        if len(right_raw['x']) > 0:
+            rx, ry, rz = self.pcd_converter.apply_transformations(
+                right_raw['x'], right_raw['y'], right_raw['z'], meters_to_mm=True, flip_z=True
+            )
+            right_points = {'x': rx, 'y': ry, 'z': rz}
+        else:
+            right_points = {'x': np.array([]), 'y': np.array([]), 'z': np.array([])}
+
+        # Step 3: Estimate depth for each side using converted halves (separate analysis)
+        left_results = self.estimate_depth_from_arrays(left_points, 'left')
+        right_results = self.estimate_depth_from_arrays(right_points, 'right')
+        
+        # Step 4: Analyze bilateral consistency
+        bilateral_analysis = self.analyze_bilateral_consistency(left_results, right_results)
+        
+        return left_results, right_results, bilateral_analysis, split_line
+    
+    def _process_with_global_analysis(self, x_converted: np.ndarray, y_converted: np.ndarray, z_converted: np.ndarray,
+                                     file_info: Dict) -> Tuple[Dict, Dict, Dict, float, Dict]:
+        """
+        Process point cloud with global plane analysis first (convert, then split)
+        
+        Args:
+            x_converted, y_converted, z_converted: Converted point cloud coordinates
+            file_info: File information dictionary
+            
+        Returns:
+            Tuple of (left_results, right_results, bilateral_analysis, split_line, global_plane_params)
+        """
+        print(f"  🌐 Using global plane analysis method")
+        
+        # Step 1: Estimate global plane from converted point cloud
+        global_plane_params = self.estimate_global_plane(x_converted, y_converted, z_converted)
+        
+        # Step 2: Split converted point cloud into left/right
+        print(f"  ✂️  Splitting converted point cloud...")
+        left_points, right_points, split_line = self.pcd_tester.split_point_cloud(
+            x_converted, y_converted, z_converted
+        )
+        
+        print(f"     Left: {len(left_points['x']):,} points")
+        print(f"     Right: {len(right_points['x']):,} points")
+        print(f"     Split line: x = {split_line:.6f}")
+        
+        # Step 3: Estimate depth for each side using global plane parameters
+        left_results = self.estimate_depth_from_arrays(left_points, 'left', global_plane_params)
+        right_results = self.estimate_depth_from_arrays(right_points, 'right', global_plane_params)
+        
+        # Step 4: Analyze bilateral consistency
+        bilateral_analysis = self.analyze_bilateral_consistency(left_results, right_results)
+        
+        return left_results, right_results, bilateral_analysis, split_line, global_plane_params
 
     def process_pcd_file(self, pcd_file: str, output_folder: str = None) -> Dict:
         """
@@ -112,29 +234,61 @@ class SinglePCDAnalyzer:
         print(f"   Output folder: {output_folder}")
         
         try:
-            # Step 1: Load raw PCD
-            print("  📁 Loading raw PCD file...")
-            x_raw, y_raw, z_raw, header_lines = self.pcd_converter.load_pcd_file(str(pcd_path))
-            print(f"     Loaded {len(x_raw):,} points")
+            # Prepare file information
+            file_info = {
+                'original_file': str(pcd_path),
+                'filename': pcd_path.name,
+                'stem': pcd_path.stem
+            }
             
-            # Step 2: Convert coordinates for entire point cloud first
-            print("  🔄 Converting coordinates (meters→mm, flip z) for entire point cloud...")
-            x_converted, y_converted, z_converted = self.pcd_converter.apply_transformations(
-                x_raw, y_raw, z_raw, meters_to_mm=True, flip_z=True
-            )
-            print(f"     Converted {len(x_converted):,} points")
+            # Branch based on analysis method
+            if self.analysis_method == 'separate':
+                # Load raw PCD (don't convert yet)
+                print("  📁 Loading raw PCD file (no conversion yet)...")
+                x_raw, y_raw, z_raw, header_lines = self.pcd_converter.load_pcd_file(str(pcd_path))
+                print(f"     Loaded {len(x_raw):,} points")
+                file_info['original_points'] = len(x_raw)
+                
+                # Process with separate analysis
+                left_results, right_results, bilateral_analysis, split_line = self._process_with_separate_analysis(
+                    x_raw, y_raw, z_raw, file_info
+                )
+                global_plane_params = None  # Not used in separate analysis
+                
+                # For visualization, we need converted coordinates
+                x_converted, y_converted, z_converted = self.pcd_converter.apply_transformations(
+                    x_raw, y_raw, z_raw, meters_to_mm=True, flip_z=True
+                )
+                
+            else:  # global analysis
+                # Load raw PCD first (needed for visualization)
+                print("  📁 Loading raw PCD file...")
+                x_raw, y_raw, z_raw, header_lines = self.pcd_converter.load_pcd_file(str(pcd_path))
+                print(f"     Loaded {len(x_raw):,} points")
+                file_info['original_points'] = len(x_raw)
+                
+                # Convert entire point cloud
+                x_converted, y_converted, z_converted = self.pcd_converter.apply_transformations(
+                    x_raw, y_raw, z_raw, meters_to_mm=True, flip_z=True
+                )
+                
+                # Process with global analysis
+                left_results, right_results, bilateral_analysis, split_line, global_plane_params = self._process_with_global_analysis(
+                    x_converted, y_converted, z_converted, file_info
+                )
             
-            # Step 3: Estimate global surface plane from entire point cloud
-            print("  📐 Estimating global surface plane from entire point cloud...")
-            global_plane_params = self.estimate_global_plane(x_converted, y_converted, z_converted)
-            print(f"     Global plane normal: ({global_plane_params['normal'][0]:.3f}, {global_plane_params['normal'][1]:.3f}, {global_plane_params['normal'][2]:.3f})")
-            print(f"     Global plane point: ({global_plane_params['point'][0]:.3f}, {global_plane_params['point'][1]:.3f}, {global_plane_params['point'][2]:.3f})")
-            
-            # Step 4: Split the converted point cloud
-            print("  ✂️  Splitting converted point cloud...")
-            left_points, right_points, split_line = self.pcd_tester.split_point_cloud(
+            # Get split points for saving intermediate files and results
+            left_points, right_points, _ = self.pcd_tester.split_point_cloud(
                 x_converted, y_converted, z_converted
             )
+            
+            # Save intermediate files if requested
+            processed_files = {}
+            if self.save_intermediate:
+                print("  💾 Saving processed halves...")
+                processed_files = self.save_split_pcds(
+                    pcd_path, left_points, right_points, output_folder
+                )
             
             # Create split info dictionary
             split_info = {
@@ -145,37 +299,6 @@ class SinglePCDAnalyzer:
                 'right_count': len(right_points['x']),
                 'global_plane_params': global_plane_params
             }
-            
-            print(f"     Left points: {len(left_points['x']):,}")
-            print(f"     Right points: {len(right_points['x']):,}")
-            print(f"     Split line: {split_line:.3f}")
-            
-            # Convert split points to the format expected by the estimator
-            left_converted = left_points  # Already in dictionary format
-            right_converted = right_points  # Already in dictionary format
-            
-            print(f"     Left converted: {len(left_converted['x']):,} points")
-            print(f"     Right converted: {len(right_converted['x']):,} points")
-            
-            # Step 4: Save intermediate files if requested
-            processed_files = {}
-            if self.save_intermediate:
-                print("  💾 Saving processed halves...")
-                processed_files = self.save_split_pcds(
-                    pcd_path, left_converted, right_converted, output_folder
-                )
-            
-            # Step 5: Run depth estimation on each half using global plane parameters
-            print("  🎯 Running depth estimation with global plane parameters...")
-            # Estimate right side
-            right_results = self.estimate_depth_from_arrays(
-                right_converted, 'right', global_plane_params
-            )
-
-            # Estimate left side
-            left_results = self.estimate_depth_from_arrays(
-                left_converted, 'left', global_plane_params
-            )
             
             # Step 6: Print depth results
             self.print_depth_results(left_results, right_results)
@@ -190,6 +313,7 @@ class SinglePCDAnalyzer:
                 'processed_files': processed_files,
                 'left_results': left_results,
                 'right_results': right_results,
+                'bilateral_analysis': bilateral_analysis,
                 'estimator_params': self.estimator_params
             }
             
@@ -1307,6 +1431,27 @@ Optimization Cost: {left_results.get('optimization_cost', 'N/A')}"""
         ax.scatter([apex[0]], [apex[1]], [apex[2]], c='red', s=50, marker='*', 
                   label='Apex', alpha=1.0)
 
+class SinglePCDAnalyzer(CountersinkAnalysisBase):
+    """Single PCD analyzer with both separate and global analysis methods"""
+    
+    def __init__(self, 
+                 estimator_params: Dict = None,
+                 save_intermediate: bool = True,
+                 generate_plots: bool = False,
+                 analysis_method: str = 'global'):
+        """
+        Initialize single PCD analyzer
+        
+        Args:
+            estimator_params: Parameters for CountersinkDepthEstimator
+            save_intermediate: Save intermediate processed PCD files
+            generate_plots: Generate visualization plots for analysis
+            analysis_method: 'separate' (split first) or 'global' (global plane first)
+        """
+        super().__init__(estimator_params, save_intermediate, generate_plots, analysis_method)
+        print(f"🚀 Single PCD Analyzer initialized")
+
+
 def main():
     """Main function for command line usage"""
     parser = argparse.ArgumentParser(description="Analyze a single PCD file for countersink depth")
@@ -1339,6 +1484,8 @@ def main():
                        help='Outlier threshold')
     parser.add_argument('--random-seed', type=int, default=42,
                        help='Random seed for reproducible results')
+    parser.add_argument('--analysis-method', choices=['separate', 'global'], default='global',
+                       help='Analysis method: separate (split first) or global (global plane first)')
     
     args = parser.parse_args()
     
@@ -1359,7 +1506,8 @@ def main():
         analyzer = SinglePCDAnalyzer(
             estimator_params=estimator_params,
             save_intermediate=args.save_intermediate,
-            generate_plots=args.plot
+            generate_plots=args.plot,
+            analysis_method=args.analysis_method
         )
         
         # Process the file

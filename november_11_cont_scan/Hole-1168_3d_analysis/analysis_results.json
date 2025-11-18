@@ -1,0 +1,141 @@
+{
+  "input_file": "november_11_cont_scan\\Hole-1168_3d.pcd",
+  "output_folder": "november_11_cont_scan\\Hole-1168_3d_analysis",
+  "timestamp": "2025-11-18T14:06:30.647723",
+  "original_points": 137805,
+  "split_info": {
+    "method": "center",
+    "split_line": -0.06899980000000117,
+    "no_use_zone_percent": 30,
+    "left_count": 53253,
+    "right_count": 52037,
+    "global_plane_params": {
+      "normal": [
+        -0.014018332165143612,
+        0.04739854910409652,
+        0.9987776849259971
+      ],
+      "point": [
+        1.2870940023999984,
+        3.506376405800003,
+        -80.18206601530001
+      ],
+      "threshold": 0.19402743341541526,
+      "filtered_points": 137158,
+      "original_points": 137805
+    }
+  },
+  "processed_files": {
+    "left": "november_11_cont_scan\\Hole-1168_3d_analysis\\Hole-1168_3d_left_processed.pcd",
+    "right": "november_11_cont_scan\\Hole-1168_3d_analysis\\Hole-1168_3d_right_processed.pcd"
+  },
+  "left_results": {
+    "estimated_total_depth": 1.1003155229820267,
+    "estimated_apex_depth": 2.144504154701787,
+    "fit_rmse": 0.04808838395714906,
+    "total_points": 52460,
+    "surface_points": 43018,
+    "hole_points": 9442,
+    "cone_apex": [
+      -8.916444331242849,
+      4.546329702744518,
+      -82.52175887888947
+    ],
+    "cone_axis": [
+      -0.02735054254368069,
+      0.03650751654334728,
+      0.9989590327227658
+    ],
+    "cone_half_angle": 0.8726646259971648,
+    "surface_normal": [
+      -0.014018332165143612,
+      0.04739854910409652,
+      0.9987776849259971
+    ],
+    "surface_point": [
+      1.2870940023999984,
+      3.506376405800003,
+      -80.18206601530001
+    ],
+    "inner_radius_intersection_point": [
+      -8.945007689861106,
+      4.584456086732119,
+      -81.47850260523283
+    ],
+    "inner_to_apex_distance": 1.0443434009632366,
+    "optimization_cost": NaN,
+    "optimization_iterations": 0,
+    "side": "left",
+    "success": true,
+    "error_message": null
+  },
+  "right_results": {
+    "estimated_total_depth": 1.0440069804996035,
+    "estimated_apex_depth": 2.087996538223945,
+    "fit_rmse": 0.05221240714256576,
+    "total_points": 51423,
+    "surface_points": 42600,
+    "hole_points": 8823,
+    "cone_apex": [
+      8.74322498076399,
+      4.682877399847538,
+      -82.22380011530736
+    ],
+    "cone_axis": [
+      -0.03400523207955401,
+      0.03072125699642458,
+      0.99894937237068
+    ],
+    "cone_half_angle": 0.8726646259971648,
+    "surface_normal": [
+      -0.014018332165143612,
+      0.04739854910409652,
+      0.9987776849259971
+    ],
+    "surface_point": [
+      1.2870940023999984,
+      3.506376405800003,
+      -80.18206601530001
+    ],
+    "inner_radius_intersection_point": [
+      8.707711841043485,
+      4.714960941861049,
+      -81.18055393037567
+    ],
+    "inner_to_apex_distance": 1.0443434009632395,
+    "optimization_cost": NaN,
+    "optimization_iterations": 0,
+    "side": "right",
+    "success": true,
+    "error_message": null
+  },
+  "bilateral_analysis": {
+    "both_successful": true,
+    "left_successful": true,
+    "right_successful": true,
+    "depth_difference_mm": 0.05630854248242323,
+    "apex_difference_mm": 0.05650761647784197,
+    "average_depth_mm": 1.0721612517408152,
+    "average_apex_depth_mm": 2.116250346462866,
+    "relative_depth_difference_percent": 5.251872550980352,
+    "relative_apex_difference_percent": 2.670176360386175,
+    "depth_consistency": "fair",
+    "left_rmse": 0.04808838395714906,
+    "right_rmse": 0.05221240714256576,
+    "average_rmse": 0.05015039554985741
+  },
+  "estimator_params": {
+    "expected_csk_angle_deg": 100.0,
+    "expected_inner_radius": 1.2446,
+    "optimizer": "slsqp",
+    "flip_z": false,
+    "meters_to_mm": false,
+    "noise_filter": true,
+    "noise_neighbors": 100,
+    "noise_radius": 0.5,
+    "outlier_method": "percentile",
+    "outlier_threshold": 0.02,
+    "random_seed": 42,
+    "ransac_sample_points": 3
+  }
+}

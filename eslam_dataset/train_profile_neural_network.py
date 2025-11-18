@@ -1795,7 +1795,7 @@ def main():
     parser.add_argument('--noise-min-neighbors', type=int, default=5, help='Minimum neighbors for noise removal (including point itself)')
     parser.add_argument('--noise-radius', type=float, default=0.05, help='Radius in mm for noise removal vicinity search')
     parser.add_argument('--disable-noise-removal', action='store_true', help='Disable noise removal preprocessing')
-    parser.add_argument('--layers', nargs='+', type=int, default=[1024, 1024, 1024, 512, 512, 512, 256, 256, 256], 
+    parser.add_argument('--layers', nargs='+', type=int, default=[1024, 512, 256], 
                        help='Hidden layer sizes')
     parser.add_argument('--activation', default='relu', help='Activation function')
     parser.add_argument('--epochs', type=int, default=500, help='Training epochs')

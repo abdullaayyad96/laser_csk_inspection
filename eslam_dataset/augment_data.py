@@ -30,10 +30,10 @@ class DataAugmentator:
     def __init__(self, split_dataset_directory: str = "split_dataset", 
                  output_directory: str = "augmented_dataset",
                  random_seed: int = 42,
-                 enable_z_offset: bool = False,
-                 enable_x_shift: bool = False, 
-                 enable_y_rotation: bool = False,
-                 enable_z_noise: bool = False):
+                 enable_z_offset: bool = True,
+                 enable_x_shift: bool = True, 
+                 enable_y_rotation: bool = True,
+                 enable_z_noise: bool = True):
         """
         Initialize the data augmentator
         

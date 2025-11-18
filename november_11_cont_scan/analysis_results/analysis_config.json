@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-11-10T17:52:45.679799",
+  "dataset_folder": "november_11_cont_scan",
+  "output_folder": "november_11_cont_scan\\analysis_results",
+  "estimator_params": {
+    "expected_csk_angle_deg": 100.0,
+    "expected_inner_radius": 1.2446,
+    "optimizer": "slsqp",
+    "flip_z": false,
+    "meters_to_mm": false,
+    "noise_filter": true,
+    "noise_neighbors": 100,
+    "noise_radius": 0.5,
+    "outlier_method": "percentile",
+    "outlier_threshold": 0.1,
+    "random_seed": 42,
+    "ransac_sample_points": 3
+  },
+  "processing_settings": {
+    "save_intermediate": true,
+    "generate_plots": false,
+    "preprocessing": [
+      "meters_to_mm",
+      "flip_z"
+    ],
+    "split_method": "center"
+  },
+  "files_processed": 3
+}

@@ -1,0 +1,28 @@
+BATCH COUNTERSINK ANALYSIS SUMMARY REPORT
+==================================================
+Generated: 2025-11-10 17:52:45
+
+DATASET OVERVIEW:
+  Dataset folder: november_11_cont_scan
+  Output folder: november_11_cont_scan\analysis_results
+  Total files processed: 3
+  Successful analyses: 3
+  Success rate: 100.0%
+
+DEPTH ANALYSIS:
+  Mean depth: 1.0604 ± 0.0042 mm
+  Median depth: 1.0596 mm
+  Range: 1.0558 to 1.0659 mm
+  Variation: 0.0042 mm
+
+BILATERAL CONSISTENCY:
+  Mean difference: 0.0462 ± 0.0085 mm
+  Maximum difference: 0.0578 mm
+  Mean relative difference: 4.35%
+  Maximum relative difference: 5.42%
+
+CONSISTENCY RATING DISTRIBUTION:
+  Excellent: 2 (66.7%)
+  Good: 1 (33.3%)
+  Fair: 0 (0.0%)
+  Poor: 0 (0.0%)

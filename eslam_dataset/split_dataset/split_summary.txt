@@ -1,0 +1,100 @@
+DATASET SPLIT SUMMARY
+==================================================
+
+Splitting mode: profile_based
+Random seed: 42
+Total profiles: 364
+
+SPLIT STATISTICS
+--------------------
+Training:    254 profiles ( 69.8%)
+Validation:   54 profiles ( 14.8%)
+Testing:      56 profiles ( 15.4%)
+
+DETAILED BREAKDOWN
+--------------------
+
+Training:
+  Hole-1168:  11 profiles
+  Hole-1169:   7 profiles
+  Hole-1170:  10 profiles
+  Hole-1171:  10 profiles
+  Hole-1172:  11 profiles
+  Hole-1173:   8 profiles
+  Hole-1174:   8 profiles
+  Hole-1175:   9 profiles
+  Hole-1176:  12 profiles
+  Hole-1177:   9 profiles
+  Hole-1178:  11 profiles
+  Hole-1179:   9 profiles
+  Hole-1180:   9 profiles
+  Hole-1181:  11 profiles
+  Hole-1182:  10 profiles
+  Hole-1183:   6 profiles
+  Hole-1184:  10 profiles
+  Hole-1185:   5 profiles
+  Hole-1186:  10 profiles
+  Hole-1187:   9 profiles
+  Hole-1188:  10 profiles
+  Hole-1189:  10 profiles
+  Hole-1190:  10 profiles
+  Hole-1191:   8 profiles
+  Hole-1192:   8 profiles
+  Hole-1193:  10 profiles
+  Hole-1194:   5 profiles
+  Hole-1195:   8 profiles
+
+Validation:
+  Hole-1169:   3 profiles
+  Hole-1170:   2 profiles
+  Hole-1171:   2 profiles
+  Hole-1173:   2 profiles
+  Hole-1174:   4 profiles
+  Hole-1175:   1 profiles
+  Hole-1176:   1 profiles
+  Hole-1177:   3 profiles
+  Hole-1178:   1 profiles
+  Hole-1179:   2 profiles
+  Hole-1180:   3 profiles
+  Hole-1181:   1 profiles
+  Hole-1182:   1 profiles
+  Hole-1183:   2 profiles
+  Hole-1185:   4 profiles
+  Hole-1186:   2 profiles
+  Hole-1187:   3 profiles
+  Hole-1189:   1 profiles
+  Hole-1190:   2 profiles
+  Hole-1191:   4 profiles
+  Hole-1192:   3 profiles
+  Hole-1193:   1 profiles
+  Hole-1194:   3 profiles
+  Hole-1195:   3 profiles
+
+Testing:
+  Hole-1168:   2 profiles
+  Hole-1169:   3 profiles
+  Hole-1170:   1 profiles
+  Hole-1171:   1 profiles
+  Hole-1172:   2 profiles
+  Hole-1173:   3 profiles
+  Hole-1174:   1 profiles
+  Hole-1175:   3 profiles
+  Hole-1177:   1 profiles
+  Hole-1178:   1 profiles
+  Hole-1179:   2 profiles
+  Hole-1180:   1 profiles
+  Hole-1181:   1 profiles
+  Hole-1182:   2 profiles
+  Hole-1183:   5 profiles
+  Hole-1184:   3 profiles
+  Hole-1185:   4 profiles
+  Hole-1186:   1 profiles
+  Hole-1187:   1 profiles
+  Hole-1188:   3 profiles
+  Hole-1189:   2 profiles
+  Hole-1190:   1 profiles
+  Hole-1191:   1 profiles
+  Hole-1192:   2 profiles
+  Hole-1193:   2 profiles
+  Hole-1194:   5 profiles
+  Hole-1195:   2 profiles

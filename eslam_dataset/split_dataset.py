@@ -23,7 +23,8 @@ import random
 class DatasetSplitter:
     def __init__(self, dataset_directory: str = "profile_dataset", 
                  output_directory: str = "split_dataset",
-                 random_seed: int = 42):
+                 random_seed: int = 42,
+                 splitting_mode: str = "hole_based"):
         """
         Initialize the dataset splitter
         
@@ -31,10 +32,16 @@ class DatasetSplitter:
             dataset_directory: Directory containing the processed dataset
             output_directory: Directory to save split datasets
             random_seed: Random seed for reproducible splits
+            splitting_mode: Either "hole_based" or "profile_based"
         """
         self.dataset_directory = Path(dataset_directory)
         self.output_directory = Path(output_directory)
         self.random_seed = random_seed
+        self.splitting_mode = splitting_mode
+        
+        # Validate splitting mode
+        if splitting_mode not in ["hole_based", "profile_based"]:
+            raise ValueError(f"Invalid splitting_mode: {splitting_mode}. Must be 'hole_based' or 'profile_based'")
         
         # Set random seeds for reproducibility
         random.seed(random_seed)
@@ -46,6 +53,7 @@ class DatasetSplitter:
         print(f"📁 Dataset directory: {self.dataset_directory}")
         print(f"💾 Output directory: {self.output_directory}")
         print(f"🎲 Random seed: {random_seed}")
+        print(f"🔄 Splitting mode: {splitting_mode}")
         
         # Load dataset
         self.dataset = self.load_dataset()
@@ -137,6 +145,44 @@ class DatasetSplitter:
         
         return train_holes, val_holes, test_holes
 
+    def split_profiles_random(self, train_ratio: float = 0.7, 
+                             val_ratio: float = 0.15, 
+                             test_ratio: float = 0.15) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+        """
+        Split profiles randomly (ignoring hole assignments)
+        
+        Args:
+            train_ratio: Fraction for training set
+            val_ratio: Fraction for validation set
+            test_ratio: Fraction for test set
+            
+        Returns:
+            Tuple of (train_dataset, val_dataset, test_dataset)
+        """
+        # Verify ratios sum to 1
+        if abs(train_ratio + val_ratio + test_ratio - 1.0) > 1e-6:
+            raise ValueError(f"Ratios must sum to 1.0, got {train_ratio + val_ratio + test_ratio}")
+        
+        # Make a copy of dataset and shuffle it
+        dataset_copy = self.dataset.copy()
+        random.shuffle(dataset_copy)
+        
+        n_profiles = len(dataset_copy)
+        n_train = int(n_profiles * train_ratio)
+        n_val = int(n_profiles * val_ratio)
+        n_test = n_profiles - n_train - n_val  # Ensure all profiles are assigned
+        
+        train_dataset = dataset_copy[:n_train]
+        val_dataset = dataset_copy[n_train:n_train + n_val]
+        test_dataset = dataset_copy[n_train + n_val:]
+        
+        print(f"\n📊 Profile distribution (random split):")
+        print(f"  Training: {len(train_dataset)} profiles ({len(train_dataset)/n_profiles*100:.1f}%)")
+        print(f"  Validation: {len(val_dataset)} profiles ({len(val_dataset)/n_profiles*100:.1f}%)")
+        print(f"  Testing: {len(test_dataset)} profiles ({len(test_dataset)/n_profiles*100:.1f}%)")
+        
+        return train_dataset, val_dataset, test_dataset
+
     def create_split_datasets(self, hole_groups: Dict[str, List[Dict]], 
                              train_holes: List[str], 
                              val_holes: List[str], 
@@ -202,13 +248,13 @@ class DatasetSplitter:
                 json.dump(json_data, f, indent=2)
             print(f"  📄 Saved JSON: {json_file.name}")
 
-    def save_split_summary(self, hole_groups: Dict[str, List[Dict]], 
-                          train_holes: List[str], 
-                          val_holes: List[str], 
-                          test_holes: List[str],
-                          train_dataset: List[Dict], 
+    def save_split_summary(self, train_dataset: List[Dict], 
                           val_dataset: List[Dict], 
-                          test_dataset: List[Dict]) -> None:
+                          test_dataset: List[Dict],
+                          hole_groups: Dict[str, List[Dict]] = None, 
+                          train_holes: List[str] = None, 
+                          val_holes: List[str] = None, 
+                          test_holes: List[str] = None) -> None:
         """Save summary of the dataset split"""
         
         summary_file = self.output_directory / "split_summary.txt"
@@ -217,46 +263,74 @@ class DatasetSplitter:
             f.write("DATASET SPLIT SUMMARY\n")
             f.write("=" * 50 + "\n\n")
             
+            f.write(f"Splitting mode: {self.splitting_mode}\n")
             f.write(f"Random seed: {self.random_seed}\n")
             f.write(f"Total profiles: {len(self.dataset)}\n")
-            f.write(f"Total holes: {len(hole_groups)}\n\n")
+            if hole_groups:
+                f.write(f"Total holes: {len(hole_groups)}\n")
+            f.write("\n")
             
             # Split statistics
             f.write("SPLIT STATISTICS\n")
             f.write("-" * 20 + "\n")
-            f.write(f"Training:   {len(train_dataset):4d} profiles ({len(train_dataset)/len(self.dataset)*100:5.1f}%) from {len(train_holes):2d} holes\n")
-            f.write(f"Validation: {len(val_dataset):4d} profiles ({len(val_dataset)/len(self.dataset)*100:5.1f}%) from {len(val_holes):2d} holes\n")
-            f.write(f"Testing:    {len(test_dataset):4d} profiles ({len(test_dataset)/len(self.dataset)*100:5.1f}%) from {len(test_holes):2d} holes\n\n")
+            if self.splitting_mode == "hole_based" and train_holes is not None:
+                f.write(f"Training:   {len(train_dataset):4d} profiles ({len(train_dataset)/len(self.dataset)*100:5.1f}%) from {len(train_holes):2d} holes\n")
+                f.write(f"Validation: {len(val_dataset):4d} profiles ({len(val_dataset)/len(self.dataset)*100:5.1f}%) from {len(val_holes):2d} holes\n")
+                f.write(f"Testing:    {len(test_dataset):4d} profiles ({len(test_dataset)/len(self.dataset)*100:5.1f}%) from {len(test_holes):2d} holes\n\n")
+            else:
+                f.write(f"Training:   {len(train_dataset):4d} profiles ({len(train_dataset)/len(self.dataset)*100:5.1f}%)\n")
+                f.write(f"Validation: {len(val_dataset):4d} profiles ({len(val_dataset)/len(self.dataset)*100:5.1f}%)\n")
+                f.write(f"Testing:    {len(test_dataset):4d} profiles ({len(test_dataset)/len(self.dataset)*100:5.1f}%)\n\n")
             
-            # Hole assignments
-            f.write("HOLE ASSIGNMENTS\n")
-            f.write("-" * 20 + "\n")
-            f.write(f"Training holes:   {sorted(train_holes)}\n")
-            f.write(f"Validation holes: {sorted(val_holes)}\n")
-            f.write(f"Testing holes:    {sorted(test_holes)}\n\n")
+            # Hole assignments (only for hole-based splitting)
+            if self.splitting_mode == "hole_based" and train_holes is not None:
+                f.write("HOLE ASSIGNMENTS\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Training holes:   {sorted(train_holes)}\n")
+                f.write(f"Validation holes: {sorted(val_holes)}\n")
+                f.write(f"Testing holes:    {sorted(test_holes)}\n\n")
             
             # Detailed breakdown
             f.write("DETAILED BREAKDOWN\n")
             f.write("-" * 20 + "\n")
             
-            splits = [
-                ("Training", train_holes, train_dataset),
-                ("Validation", val_holes, val_dataset),
-                ("Testing", test_holes, test_dataset)
-            ]
-            
-            for split_name, holes, dataset in splits:
-                f.write(f"\n{split_name}:\n")
-                hole_profile_counts = {}
-                for profile in dataset:
-                    hole = profile['hole_number']
-                    hole_profile_counts[hole] = hole_profile_counts.get(hole, 0) + 1
+            if self.splitting_mode == "hole_based" and train_holes is not None:
+                splits = [
+                    ("Training", train_holes, train_dataset),
+                    ("Validation", val_holes, val_dataset),
+                    ("Testing", test_holes, test_dataset)
+                ]
                 
-                for hole in sorted(holes):
-                    count = hole_profile_counts.get(hole, 0)
-                    left_depth = next((p['left_csk_depth_mm'] for p in dataset if p['hole_number'] == hole), 'N/A')
-                    right_depth = next((p['right_csk_depth_mm'] for p in dataset if p['hole_number'] == hole), 'N/A')
-                    f.write(f"  Hole-{hole}: {count:3d} profiles (L:{left_depth:.3f}, R:{right_depth:.3f})\n")
+                for split_name, holes, dataset in splits:
+                    f.write(f"\n{split_name}:\n")
+                    hole_profile_counts = {}
+                    for profile in dataset:
+                        hole = profile['hole_number']
+                        hole_profile_counts[hole] = hole_profile_counts.get(hole, 0) + 1
+                    
+                    for hole in sorted(holes):
+                        count = hole_profile_counts.get(hole, 0)
+                        left_depth = next((p['left_csk_depth_mm'] for p in dataset if p['hole_number'] == hole), 'N/A')
+                        right_depth = next((p['right_csk_depth_mm'] for p in dataset if p['hole_number'] == hole), 'N/A')
+                        f.write(f"  Hole-{hole}: {count:3d} profiles (L:{left_depth:.3f}, R:{right_depth:.3f})\n")
+            else:
+                # For profile-based splitting, show hole distribution in each split
+                splits = [
+                    ("Training", train_dataset),
+                    ("Validation", val_dataset),
+                    ("Testing", test_dataset)
+                ]
+                
+                for split_name, dataset in splits:
+                    f.write(f"\n{split_name}:\n")
+                    hole_profile_counts = {}
+                    for profile in dataset:
+                        hole = profile['hole_number']
+                        hole_profile_counts[hole] = hole_profile_counts.get(hole, 0) + 1
+                    
+                    for hole in sorted(hole_profile_counts.keys()):
+                        count = hole_profile_counts[hole]
+                        f.write(f"  Hole-{hole}: {count:3d} profiles\n")
         
         print(f"📋 Saved split summary: {summary_file.name}")
 
@@ -274,26 +348,50 @@ class DatasetSplitter:
         print(f"\n🚀 Starting dataset split...")
         print(f"📊 Split ratios - Train: {train_ratio:.1%}, Val: {val_ratio:.1%}, Test: {test_ratio:.1%}")
         
-        # Group profiles by hole
-        hole_groups = self.group_profiles_by_hole()
-        
-        # Split holes into train/val/test
-        train_holes, val_holes, test_holes = self.split_holes_stratified(
-            hole_groups, train_ratio, val_ratio, test_ratio
-        )
-        
-        # Create split datasets
-        train_dataset, val_dataset, test_dataset = self.create_split_datasets(
-            hole_groups, train_holes, val_holes, test_holes
-        )
+        if self.splitting_mode == "hole_based":
+            print("🎯 Using hole-based stratified splitting (no data leakage)")
+            
+            # Group profiles by hole
+            hole_groups = self.group_profiles_by_hole()
+            
+            # Split holes into train/val/test
+            train_holes, val_holes, test_holes = self.split_holes_stratified(
+                hole_groups, train_ratio, val_ratio, test_ratio
+            )
+            
+            # Create split datasets
+            train_dataset, val_dataset, test_dataset = self.create_split_datasets(
+                hole_groups, train_holes, val_holes, test_holes
+            )
+            
+            # Save summary with hole information
+            hole_groups_for_summary = hole_groups
+            train_holes_for_summary = train_holes
+            val_holes_for_summary = val_holes
+            test_holes_for_summary = test_holes
+            
+        else:  # profile_based
+            print("🎲 Using random profile-based splitting (faster training)")
+            
+            # Split profiles randomly
+            train_dataset, val_dataset, test_dataset = self.split_profiles_random(
+                train_ratio, val_ratio, test_ratio
+            )
+            
+            # No hole information for summary
+            hole_groups_for_summary = None
+            train_holes_for_summary = None
+            val_holes_for_summary = None
+            test_holes_for_summary = None
         
         # Save split datasets
         self.save_split_datasets(train_dataset, val_dataset, test_dataset)
         
         # Save summary
         self.save_split_summary(
-            hole_groups, train_holes, val_holes, test_holes,
-            train_dataset, val_dataset, test_dataset
+            train_dataset, val_dataset, test_dataset,
+            hole_groups_for_summary, train_holes_for_summary, 
+            val_holes_for_summary, test_holes_for_summary
         )
         
         print(f"\n🎉 Dataset split complete!")
@@ -341,6 +439,12 @@ def main():
         default=42,
         help='Random seed for reproducible splits (default: 42)'
     )
+    parser.add_argument(
+        '--splitting-mode', '-m',
+        choices=['hole_based', 'profile_based'],
+        default='hole_based',
+        help='Splitting strategy: hole_based (stratified, no leakage) or profile_based (random profiles) (default: hole_based)'
+    )
     
     args = parser.parse_args()
     
@@ -352,7 +456,8 @@ def main():
         splitter = DatasetSplitter(
             dataset_directory=args.dataset_dir,
             output_directory=args.output_dir,
-            random_seed=args.random_seed
+            random_seed=args.random_seed,
+            splitting_mode=args.splitting_mode
         )
         
         # Split dataset

@@ -38,12 +38,13 @@ try:
     from countersink_depth_estimator import CountersinkDepthEstimator
     from test_pcd_loading_and_splitting import PCDTester
     from convert_pcd import PCDConverter
+    from single_pcd_analysis import CountersinkAnalysisBase
 except ImportError as e:
     print(f"❌ Error importing required modules: {e}")
     print("Please ensure all required scripts are in the same directory")
     sys.exit(1)
 
-class BatchCountersinkAnalyzer:
+class BatchCountersinkAnalyzer(CountersinkAnalysisBase):
     def __init__(self, 
                  dataset_folder: str,
                  output_folder: str = None,
@@ -62,15 +63,11 @@ class BatchCountersinkAnalyzer:
             generate_plots: Generate visualization plots for each analysis
             analysis_method: 'separate' (analyze left/right separately) or 'global' (global plane first)
         """
+        # Initialize base class
+        super().__init__(estimator_params, save_intermediate, generate_plots, analysis_method)
+        
         self.dataset_folder = Path(dataset_folder)
         self.output_folder = Path(output_folder) if output_folder else self.dataset_folder / "analysis_results"
-        self.save_intermediate = save_intermediate
-        self.generate_plots = generate_plots
-        self.analysis_method = analysis_method
-        
-        # Validate analysis method
-        if self.analysis_method not in ['separate', 'global']:
-            raise ValueError("analysis_method must be 'separate' or 'global'")
         
         # Create output directories
         self.output_folder.mkdir(exist_ok=True)
@@ -78,31 +75,6 @@ class BatchCountersinkAnalyzer:
             (self.output_folder / "processed_pcds").mkdir(exist_ok=True)
         if self.generate_plots:
             (self.output_folder / "plots").mkdir(exist_ok=True)
-        
-        # Initialize components with reusable functionality
-        self.pcd_converter = PCDConverter()
-        self.pcd_tester = PCDTester(split_method='center', no_use_zone_percent=30)  # Use center split method
-        
-        # Default estimator parameters
-        default_params = {
-            'expected_csk_angle_deg': 100.0,
-            'expected_inner_radius': 1.2446,
-            'optimizer': 'slsqp',        # Match countersink_depth_estimator.py default
-            'flip_z': False,  # We handle this in preprocessing
-            'meters_to_mm': False,  # We handle this in preprocessing
-            'noise_filter': True,
-            'noise_neighbors': 100,  # Match countersink_depth_estimator.py default
-            'noise_radius': 0.5,     # Match countersink_depth_estimator.py default
-            'outlier_method': 'percentile',
-            'outlier_threshold': 0.1,
-            'random_seed': 42,
-            'ransac_sample_points': 3
-        }
-        
-        if estimator_params:
-            default_params.update(estimator_params)
-        
-        self.estimator_params = default_params
         
         # Results storage
         self.results = []
@@ -611,10 +583,22 @@ class BatchCountersinkAnalyzer:
         print(f"  🔄 Loading raw PCD (no conversion yet): {pcd_file.name}")
         x_raw, y_raw, z_raw = self.pcd_tester.load_pcd_file(str(pcd_file))
 
-        # Step 2: Split raw point cloud into left/right (split BEFORE conversion)
-        left_raw, right_raw, split_line = self.pcd_tester.split_point_cloud(x_raw, y_raw, z_raw)
-    
-        print(f"  ✨ Converting left half ({len(left_raw['x'])} pts) to mm + flip Z")
+        # Step 2-5: Use base class method for core processing
+        file_info = {
+            'original_file': str(pcd_file),
+            'filename': pcd_file.name,
+            'stem': pcd_file.stem,
+            'hole_number': hole_number,
+            'analysis_method': 'separate'
+        }
+        
+        left_results, right_results, bilateral_analysis, split_line = super()._process_with_separate_analysis(
+            x_raw, y_raw, z_raw, file_info
+        )
+        
+        # Batch-specific: Extract points for saving and visualization
+        left_raw, right_raw, _ = self.pcd_tester.split_point_cloud(x_raw, y_raw, z_raw)
+        
         if len(left_raw['x']) > 0:
             lx, ly, lz = self.pcd_converter.apply_transformations(
                 left_raw['x'], left_raw['y'], left_raw['z'], meters_to_mm=True, flip_z=True
@@ -623,7 +607,6 @@ class BatchCountersinkAnalyzer:
         else:
             left_points = {'x': np.array([]), 'y': np.array([]), 'z': np.array([])}
 
-        print(f"  ✨ Converting right half ({len(right_raw['x'])} pts) to mm + flip Z")
         if len(right_raw['x']) > 0:
             rx, ry, rz = self.pcd_converter.apply_transformations(
                 right_raw['x'], right_raw['y'], right_raw['z'], meters_to_mm=True, flip_z=True
@@ -632,15 +615,8 @@ class BatchCountersinkAnalyzer:
         else:
             right_points = {'x': np.array([]), 'y': np.array([]), 'z': np.array([])}
 
-        # Step 3: Save intermediate processed PCDs (converted halves) if requested
+        # Batch-specific: Save intermediate processed PCDs if requested
         left_filename, right_filename = self.save_split_pcds(left_points, right_points, hole_number)
-
-        # Step 4: Estimate depth for each side using converted halves (separate analysis)
-        right_results = self.estimate_depth_from_file(right_filename, right_points, 'right')
-        left_results = self.estimate_depth_from_file(left_filename, left_points, 'left')
-        
-        # Step 5: Analyze bilateral consistency
-        bilateral_analysis = self.analyze_bilateral_consistency(left_results, right_results)
         
         # Step 6: Generate visualization
         self.generate_visualization(hole_number, left_points, right_points, 
@@ -689,12 +665,21 @@ class BatchCountersinkAnalyzer:
         )
         print(f"     Converted {len(x_converted):,} points to mm and flipped Z")
         
-        # Step 2: Estimate global plane from converted point cloud
-        global_plane_params = self.estimate_global_plane(x_converted, y_converted, z_converted)
+        # Step 2-6: Use base class method for core processing
+        file_info = {
+            'original_file': str(pcd_file),
+            'filename': pcd_file.name,
+            'stem': pcd_file.stem,
+            'hole_number': hole_number,
+            'analysis_method': 'global'
+        }
         
-        # Step 3: Split converted point cloud into left/right
-        print(f"  ✂️  Splitting converted point cloud...")
-        left_points, right_points, split_line = self.pcd_tester.split_point_cloud(
+        left_results, right_results, bilateral_analysis, split_line, global_plane_params = super()._process_with_global_analysis(
+            x_converted, y_converted, z_converted, file_info
+        )
+        
+        # Batch-specific: Extract points for saving and visualization (split again for consistency)
+        left_points, right_points, _ = self.pcd_tester.split_point_cloud(
             x_converted, y_converted, z_converted
         )
         
@@ -702,15 +687,8 @@ class BatchCountersinkAnalyzer:
         print(f"     Right: {len(right_points['x']):,} points")
         print(f"     Split line: x = {split_line:.6f}")
         
-        # Step 4: Save intermediate processed PCDs (converted halves) if requested
+        # Batch-specific: Save intermediate processed PCDs if requested
         left_filename, right_filename = self.save_split_pcds(left_points, right_points, hole_number)
-
-        # Step 5: Estimate depth for each side using global plane parameters
-        left_results = self.estimate_depth_with_global_plane(left_points, 'left', global_plane_params)
-        right_results = self.estimate_depth_with_global_plane(right_points, 'right', global_plane_params)
-        
-        # Step 6: Analyze bilateral consistency
-        bilateral_analysis = self.analyze_bilateral_consistency(left_results, right_results)
         
         # Step 7: Generate visualization
         self.generate_visualization(hole_number, left_points, right_points, 
