@@ -1,0 +1,26 @@
+PROCESSED PROFILE DATASETS SUMMARY
+==================================================
+
+Processing timestamp: 2025-11-19T12:36:27.943964
+Uniform samples per profile: 2048
+Angle range: -8.0° to 8.0°
+Noise removal: Enabled
+  Min neighbors: 5, Radius: 0.05 mm
+
+DATASET SIZES
+---------------
+Training:     1016 samples
+Validation:     54 samples
+Testing:        56 samples
+
+FEATURE INFORMATION
+--------------------
+Input features: 2048
+Output targets: 2 (left and right depths)
+
+TARGET STATISTICS (Training Set)
+-----------------------------------
+Left depth  - Mean: 0.000000, Std: 10.000000
+Right depth - Mean: 0.000000, Std: 10.000000
+Left range:  -22.734450 to 22.693541
+Right range: -25.765973 to 19.299199

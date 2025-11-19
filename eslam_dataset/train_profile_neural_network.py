@@ -439,23 +439,24 @@ class ProfileDatasetProcessor:
         
         # Normalization
         if normalize_features:
-            print(f"\n🔄 Normalizing features across both samples and features...")
-            # Calculate global mean and std across entire training feature matrix
-            global_mean = np.mean(self.X_train)
-            global_std = np.std(self.X_train)
-            print(f"   Global mean: {global_mean:.6f}, Global std: {global_std:.6f}")
+            print(f"\n🔄 Normalizing features by subtracting each sample's own mean...")
+            # Calculate per-sample normalization (subtract each sample's mean from itself)
+            sample_means_train = np.mean(self.X_train, axis=1, keepdims=True)
+            self.X_train = self.X_train - sample_means_train
             
-            # Apply global normalization to all datasets
-            self.X_train = (self.X_train - global_mean) / global_std
             if self.X_val is not None:
-                self.X_val = (self.X_val - global_mean) / global_std
+                sample_means_val = np.mean(self.X_val, axis=1, keepdims=True)
+                self.X_val = self.X_val - sample_means_val
+                
             if self.X_test is not None:
-                self.X_test = (self.X_test - global_mean) / global_std
+                sample_means_test = np.mean(self.X_test, axis=1, keepdims=True)
+                self.X_test = self.X_test - sample_means_test
             
-            # Store normalization parameters for later use
-            self.feature_global_mean = global_mean
-            self.feature_global_std = global_std
-            print(f"   ✅ Applied global feature normalization")
+            # Store information that we're using per-sample normalization
+            self.feature_global_mean = None  # Not applicable for per-sample normalization
+            self.feature_global_std = None   # Not applicable for per-sample normalization
+            self.per_sample_normalization = True
+            print(f"   ✅ Applied per-sample feature normalization (subtracted each sample's mean)")
         
         if normalize_targets:
             print(f"🔄 Normalizing targets using (value - mean) / range...")
@@ -525,6 +526,7 @@ class ProfileDatasetProcessor:
             'scaler_y': self.scaler_y,
             'feature_global_mean': getattr(self, 'feature_global_mean', None),
             'feature_global_std': getattr(self, 'feature_global_std', None),
+            'per_sample_normalization': getattr(self, 'per_sample_normalization', False),
             'target_left_mean': getattr(self, 'target_left_mean', None),
             'target_left_range': getattr(self, 'target_left_range', None),
             'target_right_mean': getattr(self, 'target_right_mean', None),
@@ -613,6 +615,7 @@ class ProfileDatasetProcessor:
         processor.scaler_y = data['scaler_y']
         processor.feature_global_mean = data.get('feature_global_mean', None)
         processor.feature_global_std = data.get('feature_global_std', None)
+        processor.per_sample_normalization = data.get('per_sample_normalization', False)
         processor.target_left_mean = data.get('target_left_mean', None)
         processor.target_left_range = data.get('target_left_range', None)
         processor.target_right_mean = data.get('target_right_mean', None)
@@ -635,7 +638,7 @@ class ProfileDatasetProcessor:
     
     def normalize_features_global(self, X: np.ndarray) -> np.ndarray:
         """
-        Apply global feature normalization to new data using stored parameters
+        Apply feature normalization to new data using the same method as training
         
         Args:
             X: Feature array to normalize
@@ -643,31 +646,46 @@ class ProfileDatasetProcessor:
         Returns:
             Normalized feature array
         """
-        if not hasattr(self, 'feature_global_mean') or not hasattr(self, 'feature_global_std'):
-            raise ValueError("Global normalization parameters not available. Run prepare_datasets first with normalize_features=True")
-        
-        if self.feature_global_mean is None or self.feature_global_std is None:
-            raise ValueError("Global normalization parameters are None. Features were not normalized during training")
-        
-        return (X - self.feature_global_mean) / self.feature_global_std
+        if hasattr(self, 'per_sample_normalization') and self.per_sample_normalization:
+            # Apply per-sample normalization (subtract each sample's mean from itself)
+            sample_means = np.mean(X, axis=1, keepdims=True)
+            return X - sample_means
+        else:
+            # Legacy: global normalization
+            if not hasattr(self, 'feature_global_mean') or not hasattr(self, 'feature_global_std'):
+                raise ValueError("Global normalization parameters not available. Run prepare_datasets first with normalize_features=True")
+            
+            if self.feature_global_mean is None or self.feature_global_std is None:
+                raise ValueError("Global normalization parameters are None. Features were not normalized during training")
+            
+            return (X - self.feature_global_mean) / self.feature_global_std
     
-    def denormalize_features_global(self, X_normalized: np.ndarray) -> np.ndarray:
+    def denormalize_features_global(self, X_normalized: np.ndarray, original_X: np.ndarray = None) -> np.ndarray:
         """
-        Reverse global feature normalization
+        Reverse feature normalization
         
         Args:
             X_normalized: Normalized feature array
+            original_X: Original feature array (required for per-sample normalization)
             
         Returns:
             Original scale feature array
         """
-        if not hasattr(self, 'feature_global_mean') or not hasattr(self, 'feature_global_std'):
-            raise ValueError("Global normalization parameters not available")
-        
-        if self.feature_global_mean is None or self.feature_global_std is None:
-            raise ValueError("Global normalization parameters are None")
-        
-        return X_normalized * self.feature_global_std + self.feature_global_mean
+        if hasattr(self, 'per_sample_normalization') and self.per_sample_normalization:
+            # For per-sample normalization, we need the original data to get the means back
+            if original_X is None:
+                raise ValueError("original_X is required for per-sample denormalization")
+            sample_means = np.mean(original_X, axis=1, keepdims=True)
+            return X_normalized + sample_means
+        else:
+            # Legacy: global normalization
+            if not hasattr(self, 'feature_global_mean') or not hasattr(self, 'feature_global_std'):
+                raise ValueError("Global normalization parameters not available")
+            
+            if self.feature_global_mean is None or self.feature_global_std is None:
+                raise ValueError("Global normalization parameters are None")
+            
+            return X_normalized * self.feature_global_std + self.feature_global_mean
 
     def denormalize_targets(self, y_normalized: np.ndarray) -> np.ndarray:
         """
@@ -1613,7 +1631,10 @@ class ProfileNeuralNetworkTrainer:
         if processor is not None:
             try:
                 X_input = processor.normalize_features_global(X_input)
-                print(f"🔄 Applied global feature normalization to input data")
+                if hasattr(processor, 'per_sample_normalization') and processor.per_sample_normalization:
+                    print(f"🔄 Applied per-sample feature normalization to input data")
+                else:
+                    print(f"🔄 Applied global feature normalization to input data")
             except ValueError as e:
                 print(f"⚠️  Could not apply feature normalization: {e}")
         
@@ -1625,6 +1646,7 @@ class ProfileNeuralNetworkTrainer:
             if self.model.use_classification:
                 # For classification, convert logits to depth predictions
                 y_pred = self.model.logits_to_depths(predictions)  # This already returns numpy array
+                print(f"🔄 Converted from logits to depth")
             else:
                 # For regression, predictions are already depths
                 y_pred = predictions.cpu().numpy()
@@ -1633,6 +1655,7 @@ class ProfileNeuralNetworkTrainer:
             if processor is not None and hasattr(processor, 'target_left_mean') and processor.target_left_mean is not None:
                 # Use custom denormalization (preferred method)
                 y_pred = processor.denormalize_targets(y_pred)
+                print("Denormalizing predictions to original scale using custom denormalization")
             elif scaler_y is not None:
                 try:
                     # Check if using old scaler_y (StandardScaler)
