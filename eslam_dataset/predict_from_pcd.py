@@ -241,11 +241,16 @@ class PCDPredictor:
 
 def main():
     """Main function for command line usage"""
+    # Get script directory for default paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_model = os.path.join(script_dir, 'profile_depth_model.pth')
+    default_processed_data = os.path.join(script_dir, 'processed_profile_datasets', 'processed_profile_datasets.pkl')
+    
     parser = argparse.ArgumentParser(description='Predict countersink depths from PCD file using trained neural network')
     parser.add_argument('pcd_file', help='Path to PCD file to analyze')
-    parser.add_argument('--model', required=True, help='Path to trained model (.pth file)')
-    parser.add_argument('--processed-data', required=True, 
-                       help='Path to processed dataset file (.pkl) containing normalization parameters')
+    parser.add_argument('--model', default=default_model, help='Path to trained model (.pth file) (default: profile_depth_model.pth)')
+    parser.add_argument('--processed-data', default=default_processed_data,
+                       help='Path to processed dataset file (.pkl) containing normalization parameters (default: processed_profile_datasets/processed_profile_datasets.pkl)')
     parser.add_argument('--device', default='auto', choices=['auto', 'cpu', 'cuda'],
                        help='Device to use for inference')
     parser.add_argument('--output', help='Output JSON file to save results')
