@@ -796,7 +796,8 @@ class CountersinkAnalysisBase:
         plot_file1 = output_folder / "figure1_clustering_segmentation.png"
         plt.savefig(plot_file1, dpi=300, bbox_inches='tight')
         print(f"     📊 Saved: {plot_file1.name}")
-        plt.show()
+        plt.show(block=False)
+        plt.pause(0.1)
 
     def create_right_hole_figure(self, results: Dict, output_folder: Path, right_converted, right_results):
         """Create Figure 2: Right Hole Analysis - matching countersink_depth_estimator.py style"""
@@ -971,7 +972,8 @@ class CountersinkAnalysisBase:
         print(f"     📊 Saved: {plot_file.name}")
         
         # Show the plot
-        plt.show()
+        plt.show(block=False)
+        plt.pause(0.1)
         
         # 3. Right fitted cone with inliers/outliers
         ax3 = fig2.add_subplot(2, 3, 3, projection='3d')
@@ -1074,7 +1076,7 @@ Optimization Cost: {right_results.get('optimization_cost', 'N/A')}"""
         plot_file2 = output_folder / "figure2_right_hole_analysis.png"
         plt.savefig(plot_file2, dpi=300, bbox_inches='tight')
         print(f"     📊 Saved: {plot_file2.name}")
-        plt.show()
+        plt.show(block=False)
 
     def create_left_hole_figure(self, results: Dict, output_folder: Path, left_converted, left_results):
         """Create Figure 3: Left Hole Analysis - matching countersink_depth_estimator.py style"""
@@ -1249,7 +1251,8 @@ Optimization Cost: {right_results.get('optimization_cost', 'N/A')}"""
         print(f"     📊 Saved: {plot_file.name}")
         
         # Show the plot
-        plt.show()
+        plt.show(block=False)
+        plt.pause(0.1)
         
         # 3. Left fitted cone with inliers/outliers
         ax3 = fig3.add_subplot(2, 3, 3, projection='3d')
@@ -1352,7 +1355,8 @@ Optimization Cost: {left_results.get('optimization_cost', 'N/A')}"""
         plot_file3 = output_folder / "figure3_left_hole_analysis.png"
         plt.savefig(plot_file3, dpi=300, bbox_inches='tight')
         print(f"     📊 Saved: {plot_file3.name}")
-        plt.show()
+        plt.show(block=False)
+        plt.pause(0.1)
     def plot_plane_surface(self, ax, normal, point, size=10, alpha=0.3, color='cyan'):
         """Plot a plane surface for visualization"""
         # Create a mesh grid for the plane
