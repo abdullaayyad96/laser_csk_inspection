@@ -15,7 +15,7 @@ Features:
 - Handles both classification and regression models
 - Supports different analysis methods (per-sample vs global normalization)
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 19, 2025
 """
 

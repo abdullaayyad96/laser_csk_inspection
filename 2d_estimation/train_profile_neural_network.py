@@ -10,7 +10,7 @@ Features:
 - Model saving and loading capabilities
 - Preprocessed dataset storage for visualization
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

@@ -8,7 +8,7 @@ Visualizes samples from the profile dataset showing:
 - Left and right countersink depths
 - Interactive selection of profiles
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

@@ -8,7 +8,7 @@ Processes JSON profile files to create a structured dataset with:
 - Manual countersink depths from CSV
 - Structured arrays for x, y, z coordinates
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

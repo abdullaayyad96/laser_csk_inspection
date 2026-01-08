@@ -39,17 +39,17 @@ from std_msgs.msg import Header
 import sensor_msgs.point_cloud2 as pc2
 from state_machine.srv import DepthPrediction, DepthPredictionResponse
 
-# Add the eslam_dataset directory to the path so we can import prediction modules
+# Add the 2d_estimation directory to the path so we can import prediction modules
 script_dir = os.path.dirname(os.path.abspath(__file__))
-eslam_dataset_dir = os.path.join(script_dir, 'eslam_dataset')
-sys.path.append(eslam_dataset_dir)
+_2d_estimation_dir = os.path.join(script_dir, '2d_estimation')
+sys.path.append(_2d_estimation_dir)
 
 # Import prediction functionality
 try:
     from predict_from_pcd import PCDPredictor
 except ImportError as e:
     rospy.logerr("Error importing prediction modules: {}".format(e))
-    rospy.logerr("Please ensure predict_from_pcd.py and related modules are in the eslam_dataset directory")
+    rospy.logerr("Please ensure predict_from_pcd.py and related modules are in the 2d_estimation directory")
     sys.exit(1)
 
 
@@ -62,7 +62,7 @@ class ROSDepthPredictor:
         
         # Get parameters from ROS parameter server or use defaults
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        eslam_dir = os.path.join(script_dir, 'eslam_dataset')
+        eslam_dir = os.path.join(script_dir, '2d_estimation')
         
         default_model = os.path.join(eslam_dir, 'profile_depth_model.pth')
         default_processed_data = os.path.join(eslam_dir, 'processed_profile_datasets', 'processed_profile_datasets.pkl')

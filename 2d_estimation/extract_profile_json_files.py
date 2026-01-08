@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to extract Hole-11xx_profiles.json files from zip archives with dataset prefixes
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

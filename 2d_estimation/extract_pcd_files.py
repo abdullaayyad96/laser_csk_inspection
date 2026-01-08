@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to extract Hole-11xx_3d.pcd files from zip archives
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: October 31, 2025
 """
 

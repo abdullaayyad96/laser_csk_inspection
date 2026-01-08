@@ -12,7 +12,7 @@ Applies four types of augmentations:
 The augmentation can multiply the training dataset size by up to 5x by creating 
 augmented versions of each original profile based on enabled augmentation types.
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

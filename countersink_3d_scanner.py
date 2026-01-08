@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple, Optional
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from test_claude_2d import CountersinkLaserScanner
+from simulate_countersink_2d_profile import CountersinkLaserScanner
 
 class Countersink3DScanner:
     def __init__(self,
@@ -357,12 +357,12 @@ if __name__ == "__main__":
         # 2D scanner parameters
         csk_angle=100.0,
         scanner_range=15.0,
-        x_offset=2.0,
+        x_offset=0.0,
         standoff=85.0,
         inner_radius=1.25,
         outer_rim_depth_variation=0.2,
         hole_depth=0.965,
-        inclination_angle=2.0,  # 2D scan inclination
+        inclination_angle=0.0,  # 2D scan inclination
         noise_power=0.004,
         dropout_factor=0.02,
         min_angle_deg=-8.0,
@@ -372,7 +372,7 @@ if __name__ == "__main__":
         y_max=3.0,
         y_steps=30,
         points_per_scan=int(2056/2),
-        x_inclination_angle_deg=2.0,  # 3D rotation around x-axis
+        x_inclination_angle_deg=0.0,  # 3D rotation around x-axis
         y_offset_noise=0.02  # mm positioning noise
     )
     

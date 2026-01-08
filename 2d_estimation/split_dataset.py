@@ -5,7 +5,7 @@ Dataset Splitter
 Randomly splits the profile dataset into training, validation, and testing sets.
 Ensures proper stratification by hole numbers to maintain balanced representation.
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 

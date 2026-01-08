@@ -293,7 +293,7 @@ def main():
     """Main function with command line argument parsing"""
     # Default PCD file path as specified in the request
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    default_pcd = os.path.join(script_dir, 'eslam_dataset', 'single_profile_test_pcd', 'Hole-1194_0.0mm.pcd')
+    default_pcd = os.path.join(script_dir, '2d_estimation', 'single_profile_test_pcd', 'Hole-1194_0.0mm.pcd')
     
     parser = argparse.ArgumentParser(description='Test DepthPrediction ROS service')
     parser.add_argument('pcd_file', nargs='?', default=default_pcd,
@@ -310,8 +310,8 @@ def main():
         
         # Look for test files in various locations
         search_dirs = [
-            os.path.join(script_dir, 'eslam_dataset', 'single_profile_test_pcd'),
-            os.path.join(script_dir, 'eslam_dataset'),
+            os.path.join(script_dir, '2d_estimation', 'single_profile_test_pcd'),
+            os.path.join(script_dir, '2d_estimation'),
             script_dir
         ]
         

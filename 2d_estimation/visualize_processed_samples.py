@@ -6,7 +6,7 @@ Loads the processed dataset and visualizes selected samples showing:
 - The corresponding target depths (y_train)
 - Sample metadata
 
-Author: GitHub Copilot
+Author: Abdulla Ayyad <abdullaayyad96@gmail.com>
 Date: November 1, 2025
 """
 
